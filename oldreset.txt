@@ -1,0 +1,14 @@
+
+// Reinicia o jogo
+void reset()
+{
+    uint16_t valor_x = 0;
+    jsread_x(&valor_x);
+    char frase[50];
+    sprintf(frase, "y-%d", valor_x);
+    mostrar_mensagem("linha 0", 20, 5, true);
+    mostrar_mensagem(frase, 20, 35, false);
+    mostrar_mensagem("denis", 20, 20, false);
+    mostrar_mensagem("teste2", 20, 50, false);
+    selected(3);
+}

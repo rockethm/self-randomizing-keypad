@@ -1,0 +1,137 @@
+#include <stdio.h>
+#include "pico/stdlib.h"
+
+#include "hardware/timer.h"  //Para usar o timer/alarm
+#include "ssd1306/ssd1306.h" //Para usar o display
+#include "hardware/i2c.h"    //
+#include "hardware/adc.h"    //Para usar o ADC de ler o joystic
+
+const int vrx = 26;
+const int vry = 27;
+const int ADC_CHANNEL_0 = 0;
+const int ADC_CHANNEL_1 = 1;
+const int SW = 22;
+
+volatile uint8_t linha_atual = 0;
+
+ssd1306_t disp;
+
+void setup_js(){
+    adc_init();
+    adc_gpio_init(vrx);
+}
+
+//valores de 0 a 4095
+void jsread_x(uint16_t *eixo_x){
+    adc_select_input(ADC_CHANNEL_0);
+    sleep_us(2);
+    *eixo_x = adc_read();
+}
+
+
+
+// Funcao para configurar o display
+void setup_display()
+{
+    i2c_init(i2c1, 400000);
+    gpio_set_function(14, GPIO_FUNC_I2C);
+    gpio_set_function(15, GPIO_FUNC_I2C);
+    gpio_pull_up(14);
+    gpio_pull_up(15);
+
+    disp.external_vcc = false;
+    ssd1306_init(&disp, 128, 64, 0x3C, i2c1);
+    ssd1306_clear(&disp);
+}
+
+//quadrado de selecao
+void selected(uint8_t linha){
+    uint32_t width = 3;
+    uint32_t height = 5;
+    uint32_t x = 20;
+    uint32_t y = 5;
+
+    switch(linha){
+        case 0:
+            y = 5;
+            break;
+        case 1:
+            y = 20;
+            break;
+        case 2:
+            y = 35;
+            break;
+        case 3:
+            y = 50;
+            break;
+        default:
+            y =5;
+            break;
+    }
+
+    sleep_ms(50);
+
+    ssd1306_draw_square(&disp, x, y, width, height);
+    ssd1306_show(&disp);
+}
+
+// Funcao para mostrar uma mensagem
+void mostrar_mensagem(char *str, uint32_t x, uint32_t y, bool should_clear)
+{
+    if (should_clear)
+    {
+        ssd1306_clear(&disp);
+    }
+    sleep_ms(50);
+    ssd1306_draw_string(&disp, x, y, 1, str);
+    ssd1306_show(&disp);
+}
+
+void definir_linhas(){
+    mostrar_mensagem("0 0 2", 30, 5, false);
+    mostrar_mensagem("4 5 6", 30, 20, false);
+    mostrar_mensagem("1 2 3", 30, 35, false);
+    mostrar_mensagem("7 8 9", 30, 50, false);
+    //mostrar_mensagem("******", 80, 27, false);
+}
+
+// verifica input
+void check_js()
+{
+    uint16_t valor_x = 0;
+    jsread_x(&valor_x);
+
+    /*
+    char frase[50];
+    sprintf(frase, "y-%d", valor_x);
+    mostrar_mensagem(frase, 20, 5, false);
+    */
+
+    if (valor_x < 1500 && linha_atual != 3){
+        linha_atual++;
+        ssd1306_clear_square(&disp, 17, 1, 8, 60);
+        //ssd1306_clear(&disp);
+    }
+    else if (valor_x > 2600 && linha_atual != 0){
+        linha_atual--;
+        ssd1306_clear_square(&disp, 17, 1, 8, 60);
+        //ssd1306_clear(&disp);
+    }
+    
+    selected(linha_atual);
+    definir_linhas();
+}
+
+int main()
+{
+    stdio_init_all();
+    setup_display();
+    setup_js();
+
+    definir_linhas();
+
+    while (true) {
+        check_js();
+        sleep_ms(10);
+    }
+}
