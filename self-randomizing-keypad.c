@@ -25,10 +25,13 @@ static absolute_time_t last_button_time = {0};
 
 #define NUM_LINES 4
 #define NUMBERS_PER_LINE 3
-static int numbers[] = {0,1,2,3,4,5,6,7,8,9};
+static int numbers[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
 static char pin[6];
+static uint8_t selected_lines[6]; // Array to store the selected lines
 
+// Global array to store the current lines and their digits
+static int lines[NUM_LINES][NUMBERS_PER_LINE];
 
 void shuffle(int *array, size_t n) {
     if (n > 1) {
@@ -41,23 +44,20 @@ void shuffle(int *array, size_t n) {
     }
 }
 
-
-void setup_js(){
+void setup_js() {
     adc_init();
     adc_gpio_init(vrx);
 }
 
 //valores de 0 a 4095
-void jsread_x(uint16_t *eixo_x){
+void jsread_x(uint16_t *eixo_x) {
     adc_select_input(ADC_CHANNEL_0);
     sleep_us(2);
     *eixo_x = adc_read();
 }
 
-
 // Funcao para configurar o display
-void setup_display()
-{
+void setup_display() {
     i2c_init(i2c1, 400000);
     gpio_set_function(14, GPIO_FUNC_I2C);
     gpio_set_function(15, GPIO_FUNC_I2C);
@@ -70,13 +70,13 @@ void setup_display()
 }
 
 //quadrado de selecao
-void selected(uint8_t linha){
+void selected(uint8_t linha) {
     uint32_t width = 3;
     uint32_t height = 5;
     uint32_t x = 20;
     uint32_t y = 5;
 
-    switch(linha){
+    switch (linha) {
         case 0:
             y = 5;
             break;
@@ -90,7 +90,7 @@ void selected(uint8_t linha){
             y = 50;
             break;
         default:
-            y =5;
+            y = 5;
             break;
     }
 
@@ -101,10 +101,8 @@ void selected(uint8_t linha){
 }
 
 // Funcao para mostrar uma mensagem
-void mostrar_mensagem(char *str, uint32_t x, uint32_t y, bool should_clear)
-{
-    if (should_clear)
-    {
+void mostrar_mensagem(char *str, uint32_t x, uint32_t y, bool should_clear) {
+    if (should_clear) {
         ssd1306_clear(&disp);
     }
     sleep_ms(50);
@@ -115,7 +113,6 @@ void mostrar_mensagem(char *str, uint32_t x, uint32_t y, bool should_clear)
 void definir_linhas() {
     shuffle(numbers, 10); // Shuffle the numbers array
 
-    int lines[NUM_LINES][NUMBERS_PER_LINE];
     int used_numbers[12];
 
     // Fill the first 10 slots with the shuffled numbers
@@ -149,7 +146,7 @@ void definir_linhas() {
     // Display the lines
     char linha0[10];
     sprintf(linha0, "%d %d %d", lines[0][0], lines[0][1], lines[0][2]);
-    mostrar_mensagem(linha0, 30, 5, false);
+    mostrar_mensagem(linha0, 30, 5, true);
 
     char linha1[10];
     sprintf(linha1, "%d %d %d", lines[1][0], lines[1][1], lines[1][2]);
@@ -162,37 +159,30 @@ void definir_linhas() {
     char linha3[10];
     sprintf(linha3, "%d %d %d", lines[3][0], lines[3][1], lines[3][2]);
     mostrar_mensagem(linha3, 30, 50, false);
+
+    // Reset the selected lines array
+    for (int i = 0; i < 6; i++) {
+        selected_lines[i] = 0;
+    }
 }
 
-
 // verifica input
-void check_js()
-{
+void check_js() {
     uint16_t valor_x = 0;
     jsread_x(&valor_x);
 
-    /*
-    char frase[50];
-    sprintf(frase, "y-%d", valor_x);
-    mostrar_mensagem(frase, 20, 5, false);
-    */
-
-    if (valor_x < 1500 && linha_atual != 3){
+    if (valor_x < 1500 && linha_atual != 3) {
         linha_atual++;
         ssd1306_clear_square(&disp, 17, 1, 8, 60);
-        //ssd1306_clear(&disp);
-    }
-    else if (valor_x > 2600 && linha_atual != 0){
+    } else if (valor_x > 2600 && linha_atual != 0) {
         linha_atual--;
         ssd1306_clear_square(&disp, 17, 1, 8, 60);
-        //ssd1306_clear(&disp);
     }
-    
+
     selected(linha_atual);
 }
 
 //Handler da irq
-// Modify your gpio_irq_handler like this:
 static void gpio_irq_handler(uint gpio, uint32_t evento) {
     absolute_time_t current_time = get_absolute_time();
     if (absolute_time_diff_us(last_button_time, current_time) > DEBOUNCE_TIME_MS * 1000) {
@@ -201,23 +191,38 @@ static void gpio_irq_handler(uint gpio, uint32_t evento) {
     }
 }
 
-void correct_pin(){
-    //code for verifying if pin is correct
-    //
+void correct_pin(uint8_t *selected_lines) {
+    // Hardcoded PIN (e.g., 123456)
+    uint8_t correct_pin[6] = {1, 2, 3, 4, 5, 6}; // Example PIN
 
-    //if pin is wrong do this
-    mostrar_mensagem("SENHA INCORRETA", 20, 5, true);
+    bool pin_correct = true;
+    for (int i = 0; i < 6; i++) {
+        bool digit_match = false;
+        // Check if any of the 3 digits in the selected line matches the correct PIN digit
+        for (int j = 0; j < NUMBERS_PER_LINE; j++) {
+            if (lines[selected_lines[i]][j] == correct_pin[i]) {
+                digit_match = true;
+                break;
+            }
+        }
+        if (!digit_match) {
+            pin_correct = false;
+            break;
+        }
+    }
+
+    if (pin_correct) {
+        mostrar_mensagem("SENHA CORRETA", 20, 5, true);
+    } else {
+        mostrar_mensagem("SENHA INCORRETA", 20, 5, true);
+    }
+
     sleep_ms(5000);
-    definir_linhas(); //so it "resets the system"
-    //if pin is correct do this
-    mostrar_mensagem("SENHA CORRETA", 20, 5, true);
-    sleep_ms(5000);
-    definir_linhas(); //so it "resets the system"
+
+    definir_linhas(); // Reset the system
 }
 
-
-int main()
-{
+int main() {
     stdio_init_all();
     setup_display();
     setup_js();
@@ -234,7 +239,9 @@ int main()
     while (true) {
         check_js();
         if (button_pressed) {
-            if (char_count < 6){
+            if (char_count < 6) {
+                // Store the selected line
+                selected_lines[char_count] = linha_atual;
                 frase[char_count] = '*';
                 frase[char_count + 1] = '\0';
                 char_count++;
@@ -243,8 +250,14 @@ int main()
             mostrar_mensagem(frase, 80, 27, false);
             button_pressed = false;
 
+            // Check if 6 digits have been entered
+            if (char_count == 6) {
+                correct_pin(selected_lines); // Verify the PIN
+                char_count = 0; // Reset the character count
+                frase[0] = '\0'; // Clear the displayed string
+            }
         }
-            
-        sleep_ms(50); //pequeno delay para melhor controle 
+
+        sleep_ms(50); //pequeno delay para melhor controle
     }
 }
