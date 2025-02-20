@@ -6,11 +6,21 @@
 #include "hardware/i2c.h"       //Para usar o i2c
 #include "hardware/adc.h"       //Para usar o ADC de ler o joystic
 #include "pico/rand.h"          //Para usar o RNG da Pico
+#include "hardware/pwm.h"
+#include "hardware/clocks.h"
+
+#define BUZZER_PIN 21
 
 const int vrx = 26;
 const int vry = 27;
 const int ADC_CHANNEL_0 = 0;
 const int ADC_CHANNEL_1 = 1;
+
+const uint led_pin_green = 11;
+const uint led_pin_red = 13;
+const uint16_t PERIOD = 2000;
+const float DIVIDER_PWM = 16.0;
+uint16_t led_level = 100;
 
 volatile uint8_t linha_atual = 0;
 
@@ -32,6 +42,80 @@ static uint8_t selected_lines[6]; // Array to store the selected lines
 
 // Global array to store the current lines and their digits
 static int lines[NUM_LINES][NUMBERS_PER_LINE];
+
+void init_srk(){
+
+}
+
+void pwm_init_led(uint led_pin) {
+    uint slice = pwm_gpio_to_slice_num(led_pin);
+    gpio_set_function(led_pin, GPIO_FUNC_PWM);
+    pwm_config config = pwm_get_default_config();
+    pwm_config_set_clkdiv(&config, DIVIDER_PWM);
+    pwm_config_set_wrap(&config, PERIOD);
+    pwm_init(slice, &config, true);
+    pwm_set_gpio_level(led_pin, 0); // Inicialmente desligado
+}
+
+void pwm_init_buzzer(uint pin) {
+    // Configurar o pino como saída de PWM
+    gpio_set_function(pin, GPIO_FUNC_PWM);
+
+    // Obter o slice do PWM associado ao pino
+    uint slice_num = pwm_gpio_to_slice_num(pin);
+
+    // Configurar o PWM com valores padrão
+    pwm_config config = pwm_get_default_config();
+    pwm_init(slice_num, &config, false); // Inicializa o PWM, mas não o habilita ainda
+
+    // Iniciar o PWM no nível baixo
+    pwm_set_gpio_level(pin, 0);
+}
+
+// Função para emitir um beep com frequência e duração especificadas
+void beep(uint pin, uint frequency, uint duration_ms) {
+    // Obter o slice do PWM associado ao pino
+    uint slice_num = pwm_gpio_to_slice_num(pin);
+
+    // Reconfigurar o PWM para a nova frequência
+    pwm_config config = pwm_get_default_config();
+    pwm_config_set_clkdiv(&config, clock_get_hz(clk_sys) / (frequency * 4096)); // Divisor de clock
+    pwm_init(slice_num, &config, true); // Reinicializa o PWM com a nova configuração
+
+    // Configurar o duty cycle para 50% (ativo)
+    pwm_set_gpio_level(pin, 2048);
+
+    // Temporização
+    sleep_ms(duration_ms);
+
+    // Desativar o sinal PWM (duty cycle 0)
+    pwm_set_gpio_level(pin, 0);
+}
+
+void melodia (bool resultado){
+    if (resultado) {
+        pwm_set_gpio_level(led_pin_green, led_level);
+        beep(BUZZER_PIN, 9956, 125);   // NOTE_A8.5 (3.5 octaves higher than A5)
+        beep(BUZZER_PIN, 11178, 125);  // NOTE_B8.5 (3.5 octaves higher than B5)
+        beep(BUZZER_PIN, 5916, 125);   // NOTE_C8.5 (3.5 octaves higher than C5)
+        beep(BUZZER_PIN, 11178, 125);  // NOTE_B8.5 (3.5 octaves higher than B5)
+        beep(BUZZER_PIN, 5916, 125);   // NOTE_C8.5 (3.5 octaves higher than C5)
+        beep(BUZZER_PIN, 6641, 125);   // NOTE_D8.5 (3.5 octaves higher than D5)
+        beep(BUZZER_PIN, 5916, 125);   // NOTE_C8.5 (3.5 octaves higher than C5)
+        beep(BUZZER_PIN, 6641, 125);   // NOTE_D8.5 (3.5 octaves higher than D5)
+        beep(BUZZER_PIN, 7457, 125);   // NOTE_E8.5 (3.5 octaves higher than E5)
+        beep(BUZZER_PIN, 6641, 125);   // NOTE_D8.5 (3.5 octaves higher than D5)
+        beep(BUZZER_PIN, 7457, 125);   // NOTE_E8.5 (3.5 octaves higher than E5)
+        beep(BUZZER_PIN, 7457, 125);   // NOTE_E8.5 (3.5 octaves higher than E5)
+        pwm_set_gpio_level(led_pin_green, 0);
+
+    } else {
+        pwm_set_gpio_level(led_pin_red, led_level);
+        beep(BUZZER_PIN, 3136, 500);   // NOTE_G4 (unchanged)
+        beep(BUZZER_PIN, 2092, 1000);   // NOTE_C4 (unchanged)
+        pwm_set_gpio_level(led_pin_red, 0);
+    }
+}
 
 void shuffle(int *array, size_t n) {
     if (n > 1) {
@@ -182,6 +266,7 @@ void check_js() {
     selected(linha_atual);
 }
 
+
 //Handler da irq
 static void gpio_irq_handler(uint gpio, uint32_t evento) {
     absolute_time_t current_time = get_absolute_time();
@@ -217,7 +302,9 @@ void correct_pin(uint8_t *selected_lines) {
         mostrar_mensagem("SENHA INCORRETA", 20, 5, true);
     }
 
-    sleep_ms(5000);
+    melodia(pin_correct);
+
+    sleep_ms(2500);
 
     definir_linhas(); // Reset the system
 }
@@ -231,6 +318,21 @@ int main() {
     gpio_set_dir(bt_R, GPIO_IN);
     gpio_pull_up(bt_R);
     gpio_set_irq_enabled_with_callback(bt_R, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
+
+    gpio_init(led_pin_green);
+    gpio_set_dir(led_pin_green, GPIO_OUT);
+    gpio_init(led_pin_red);
+    gpio_set_dir(led_pin_red, GPIO_OUT);
+
+    // Inicializar PWM para os LEDs
+    pwm_init_led(led_pin_green);
+    pwm_init_led(led_pin_red);
+
+    // Configuração do GPIO para o buzzer como saída
+    gpio_init(BUZZER_PIN);
+    gpio_set_dir(BUZZER_PIN, GPIO_OUT);
+    // Inicializar o PWM no pino do buzzer
+    pwm_init_buzzer(BUZZER_PIN);
 
     definir_linhas();
 
