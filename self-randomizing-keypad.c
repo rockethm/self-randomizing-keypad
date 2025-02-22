@@ -97,7 +97,7 @@
  void inicializar_pwm_buzzer(uint pin);
  
  // Funções de interface
- void mostrar_mensagem(char *str, uint32_t x, uint32_t y, bool limpar_tela);
+ void escrever_texto(char *str, uint32_t x, uint32_t y, bool limpar);
  void mostrar_selecao(uint8_t linha);
  void definir_linhas(void);
  
@@ -271,13 +271,13 @@
   * @param str String a ser mostrada
   * @param x Posição X no display
   * @param y Posição Y no display
-  * @param limpar_tela Se true, limpa o display antes de desenhar
+  * @param limpar Se true, limpa o display antes de desenhar
   */
- void mostrar_mensagem(char *str, uint32_t x, uint32_t y, bool limpar_tela) {
-     if (limpar_tela) {
+ void escrever_texto(char *str, uint32_t x, uint32_t y, bool limpar) {
+     if (limpar) {
          ssd1306_clear(&disp);
+         sleep_ms(10);
      }
-     sleep_ms(50);  // Pequeno delay para estabilização
      ssd1306_draw_string(&disp, x, y, 1, str);
      ssd1306_show(&disp);
  }
@@ -350,19 +350,19 @@
      
      // Linha 0
      sprintf(buffer, "%d %d %d", matriz_digitos[0][0], matriz_digitos[0][1], matriz_digitos[0][2]);
-     mostrar_mensagem(buffer, 30, 5, true);
+     escrever_texto(buffer, 30, 5, true);
      
      // Linha 1
      sprintf(buffer, "%d %d %d", matriz_digitos[1][0], matriz_digitos[1][1], matriz_digitos[1][2]);
-     mostrar_mensagem(buffer, 30, 20, false);
+     escrever_texto(buffer, 30, 20, false);
      
      // Linha 2
      sprintf(buffer, "%d %d %d", matriz_digitos[2][0], matriz_digitos[2][1], matriz_digitos[2][2]);
-     mostrar_mensagem(buffer, 30, 35, false);
+     escrever_texto(buffer, 30, 35, false);
      
      // Linha 3
      sprintf(buffer, "%d %d %d", matriz_digitos[3][0], matriz_digitos[3][1], matriz_digitos[3][2]);
-     mostrar_mensagem(buffer, 30, 50, false);
+     escrever_texto(buffer, 30, 50, false);
      
      // Reinicia array de linhas selecionadas
      for (int i = 0; i < PIN_LENGTH; i++) {
@@ -436,9 +436,9 @@
      
      // Mostra resultado
      if (senha_valida) {
-         mostrar_mensagem("SENHA CORRETA", 20, 5, true);
+         escrever_texto("SENHA CORRETA", 20, 5, true);
      } else {
-         mostrar_mensagem("SENHA INCORRETA", 20, 5, true);
+         escrever_texto("SENHA INCORRETA", 20, 5, true);
      }
      
      // Toca melodia de acordo com resultado
@@ -513,7 +513,7 @@
              
              // Atualiza display
              ssd1306_clear_square(&disp, 80, 27, 48, 8);
-             mostrar_mensagem(senha_display, 80, 27, false);
+             escrever_texto(senha_display, 80, 27, false);
              button_pressed = false;
              
              // Se completou a senha, verifica
