@@ -1,6 +1,6 @@
 # Self-Randomizing Keypad
 
-Sistema de fechadura eletrônica com randomização automática de dígitos para prevenir a visualização da senha por terceiros. Desenvolvido com a BitDogLab (Raspberry Pi Pico W).
+Sistema de fechadura eletrônica com randomização automática de dígitos para prevenir a visualização da senha por terceiros. Desenvolvido com a BitDogLab (Raspberry Pi Pico W) como projeto final para a capacitação do programa Embarcatech.
 
 ![Demonstração do Self-Randomizing Keypad](https://github.com/rockethm/self-randomizing-keypad/raw/main/assets/demo.gif)
 
